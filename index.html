@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platformer Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        #gameUI {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        button {
+            font-size: 20px;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameUI">
+        <button id="leftButton">Left</button>
+        <button id="rightButton">Right</button>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const gravity = 0.2;
+        const friction = 0.98; // Friction when on the platform
+        let ballVelocityX = 0;
+        let ballVelocityY = 0;
+
+        const ball = {
+            x: 100,
+            y: canvas.height - 150,
+            radius: 20,
+            color: 'red',
+            isOnGround: true, 
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
+            },
+            update() {
+                if (!this.isOnGround) {
+                    ballVelocityY += gravity;
+                } else {
+                    ballVelocityY = 0;
+                    ballVelocityX *= friction; // Apply friction when grounded
+                }
+
+                this.y += ballVelocityY;
+                this.x += ballVelocityX;
+
+                if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                } else if (this.x + this.radius > canvas.width) {
+                    this.x = canvas.width - this.radius;
+                }
+
+                this.draw();
+            }
+        };
+
+        class Platform {
+            constructor(x, y, width, height, color, isStatic) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.color = color;
+                this.isStatic = isStatic;
+                this.rotation = 0;
+                this.rotationSpeed = isStatic ? 0 : 0.02; // Only rotating platforms rotate
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+                ctx.rotate(this.rotation);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+                ctx.restore();
+            }
+
+            update() {
+                if (!this.isStatic) {
+                    this.rotation += this.rotationSpeed;
+                }
+                this.draw();
+            }
+        }
+
+        const platforms = [
+            new Platform(50, canvas.height - 100, 150, 20, 'blue', true),
+            new Platform(210, canvas.height - 100, 150, 20, 'green', false),
+            new Platform(370, canvas.height - 100, 150, 20, 'green', false),
+            new Platform(530, canvas.height - 100, 150, 20, 'red', true)
+        ];
+
+        function detectRotatingCollision(ball, platform) {
+            // Translate ball position into platform local space
+            const dx = ball.x - (platform.x + platform.width / 2);
+            const dy = ball.y - (platform.y + platform.height / 2);
+
+            // Apply reverse rotation to the ball position to match the platform's rotation
+            const angle = -platform.rotation;
+            const rotatedX = dx * Math.cos(angle) - dy * Math.sin(angle);
+            const rotatedY = dx * Math.sin(angle) + dy * Math.cos(angle);
+
+            // Check for collision in the platform's local space
+            const halfWidth = platform.width / 2;
+            const halfHeight = platform.height / 2;
+
+            if (rotatedX >= -halfWidth && rotatedX <= halfWidth &&
+                rotatedY >= -halfHeight - ball.radius && rotatedY <= halfHeight) {
+                ball.isOnGround = true;
+                ball.y = platform.y - ball.radius; // Place the ball on top of the platform
+            } else {
+                ball.isOnGround = false;
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ball.update();
+            let isOnAnyPlatform = false;
+            platforms.forEach(platform => {
+                platform.update();
+                detectRotatingCollision(ball, platform);
+
+                if (ball.isOnGround) {
+                    isOnAnyPlatform = true;
+                }
+            });
+
+            if (isOnAnyPlatform) {
+                ball.isOnGround = true;
+            } else {
+                ball.isOnGround = false;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+
+        document.getElementById('leftButton').addEventListener('click', () => {
+            ballVelocityX = -2;
+        });
+
+        document.getElementById('rightButton').addEventListener('click', () => {
+            ballVelocityX = 2;
+        });
+
+        window.addEventListener('keyup', () => {
+            ballVelocityX = 0;
+        });
+
+    </script>
+</body>
+</html>
